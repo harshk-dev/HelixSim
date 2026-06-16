@@ -1,0 +1,7 @@
+pybullet
+customtkinter
+matplotlib
+ursina
+numpy
+scipy
+pyyaml
