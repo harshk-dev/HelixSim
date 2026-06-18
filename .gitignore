@@ -5,4 +5,5 @@ roadmap.md
 __pycache__/
 assets/drone.obj
 assets/propeller.obj
+assets/grass.png
 models_compressed/
