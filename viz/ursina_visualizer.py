@@ -9,6 +9,7 @@ class UrsinaVisualizer(VizBase):
         self.app = Ursina()
         self.app.render.setShaderAuto()
         self.drone = None
+        self.updater = Entity()
 
     def run(self):
         self.app.run()
@@ -28,16 +29,23 @@ class UrsinaVisualizer(VizBase):
         self.drone = DroneViz(x=0,y=150,z=0)
 
 
-        camera.position = (500,400,-1000)
-        camera.look_at((self.drone.x,self.drone.y,self.drone.z))
-        EditorCamera()
+        camera.position = (500,400,-2000)
+        camera.look_at(self.drone.drone)
+        # EditorCamera()
 
     def update(self, state):
+        self.updater.update = self.update_engine
+        self.state = state
+
+    def update_engine(self):
+        if self.state is None:
+            return
+        
         self.drone.move(
             velox=0,
-            veloy=150,
+            veloy=0,
             veloz=0,
-            RPM=6000,
+            RPM=10000,
             dt=time.dt
         )
     

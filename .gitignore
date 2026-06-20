@@ -1,9 +1,5 @@
 .venv/
-HelixSim(V1.0).md
 file_struct_exp.md
 roadmap.md
 __pycache__/
-assets/drone.obj
-assets/propeller.obj
-assets/grass.png
 models_compressed/

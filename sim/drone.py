@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import numpy as np
 from typing import Callable
 
@@ -8,6 +8,7 @@ class DroneParam:
     arm_len: float = 0.5
     prop_radius: float = 0.25
     no_arm: int = 4
+    on_change: Callable = field(default=lambda:None,repr=False)
     
 @dataclass
 class DroneState:
