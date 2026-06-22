@@ -4,14 +4,18 @@ from PyQt6.QtWidgets import (QMainWindow, QApplication, QVBoxLayout, QHBoxLayout
 from PyQt6.QtCore import Qt
 import sys
 from .telemetry_charts import TelemetryChart
+from functools import partial
+from numpy import array,ndarray
 
 class ControlPanel(QMainWindow):
-    def __init__(self):
+    def __init__(self,shared):
         super().__init__()
         self.model_presets = ["QuadCopter","OctaCopter"]
         self.trajectory_presets = ["Hover","Straight Line","Circular Loop"]
+        self.shared = shared
         self.setWindowTitle("HelixSim - Control Panel")
         self.resize(1000, 700)
+        self.setStyleSheet(self.get_global_theme())
 
         central_Widget = QWidget()
         self.setCentralWidget(central_Widget)
@@ -25,13 +29,150 @@ class ControlPanel(QMainWindow):
         main_layout.addLayout(self.middle_layout(),stretch=2)
         main_layout.addWidget(self.bottom_layout(),stretch=2)
 
+    def get_global_theme(self):
+        return """
+        /* --- Global Base & Typography --- */
+        * {
+            /* Enforce one professional, modern font across EVERY widget */
+            font-family: "Roboto", "Segoe UI", "Noto Sans", "Helvetica Neue", sans-serif;
+        }
+
+        QWidget {
+            background-color: #141414; /* Deep graphite background */
+            color: #D4D4D4; /* Soft off-white for high legibility */
+            font-size: 13px;
+        }
+
+        QMainWindow {
+            background-color: #0E0E0E; /* Even darker for the absolute background */
+        }
+
+        /* --- Target the Main Heading --- */
+        QLabel#mainTitle {
+            font-size: 38px; /* Increased massively */
+            font-weight: 900; /* Maximum boldness */
+            letter-spacing: 8px; /* Wide, cinematic spacing */
+            text-transform: uppercase;
+            margin-bottom: 10px;
+        }
+
+        /* --- Group Boxes --- */
+        QGroupBox {
+            background-color: #1A1A1A;
+            border: 1px solid #2A2A2A;
+            border-radius: 4px;
+            margin-top: 1.5em;
+            font-weight: bold;
+        }
+        QGroupBox::title {
+            subcontrol-origin: margin;
+            subcontrol-position: top left;
+            left: 10px;
+            padding: 0 5px;
+            color: #FF9800; /* Amber */
+        }
+
+        /* --- Input Fields --- */
+        QDoubleSpinBox, QComboBox {
+            background-color: #222222;
+            border: 1px solid #333333;
+            border-radius: 3px;
+            padding: 4px 8px;
+            min-height: 24px;
+            selection-background-color: #FF9800;
+            selection-color: #000000;
+        }
+        QDoubleSpinBox:hover, QComboBox:hover {
+            border: 1px solid #555555;
+        }
+        QDoubleSpinBox:focus, QComboBox:focus {
+            border: 1px solid #FF9800;
+            background-color: #2A2A2A;
+        }
+
+        /* Clean up SpinBox Arrows */
+        QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {
+            background-color: #2A2A2A;
+            border: none;
+            width: 16px;
+        }
+        QDoubleSpinBox::up-button:hover, QDoubleSpinBox::down-button:hover {
+            background-color: #3A3A3A;
+        }
+
+        /* --- Tabs --- */
+        QTabWidget::pane {
+            border: 1px solid #2A2A2A;
+            background-color: #1A1A1A;
+            top: -1px; 
+        }
+        QTabBar::tab {
+            background-color: #141414;
+            border: 1px solid #2A2A2A;
+            border-bottom: none;
+            padding: 8px 20px;
+            margin-right: 2px;
+            color: #777777;
+            font-weight: bold; /* Make unselected tabs slightly punchier */
+        }
+        QTabBar::tab:selected {
+            background-color: #1A1A1A;
+            color: #FFFFFF;
+            border-top: 2px solid #FF9800; /* Active tab amber line */
+        }
+        QTabBar::tab:hover:!selected {
+            background-color: #222222;
+            color: #AAAAAA;
+        }
+
+        /* --- Standard Buttons --- */
+        QPushButton {
+            background-color: #2A2A2A;
+            border: 1px solid #3A3A3A;
+            border-radius: 3px;
+            padding: 6px 16px;
+            font-weight: bold;
+            color: #D4D4D4;
+        }
+        QPushButton:hover {
+            background-color: #333333;
+            border: 1px solid #555555;
+        }
+        QPushButton:pressed {
+            background-color: #FF9800;
+            color: #000000;
+        }
+
+        /* --- Specific Start Engine Button --- */
+        QPushButton#startEngineBtn {
+            background-color: #E65100; /* Deep warning orange */
+            color: white;
+            border: 1px solid #FF9800;
+            font-size: 15px; /* Slightly larger text */
+            font-weight: 900; /* Extra bold */
+            letter-spacing: 2px;
+            padding: 12px 24px;
+            border-radius: 4px;
+        }
+        QPushButton#startEngineBtn:hover {
+            background-color: #FF6D00; /* Brighter orange on hover */
+            border: 1px solid #FFA726;
+        }
+        QPushButton#startEngineBtn:pressed {
+            background-color: #F57C00;
+        }
+        """
+
     def top_layout(self):
         layout = QGridLayout()
-        heading = QLabel("HelixSim")
-        heading.setStyleSheet("font-size: 24px; letter-spacing: 5px; color: #38bdf8;")
+        
+        heading = QLabel('<span style="color: #FF9800;">⬢</span> <span style="color: #FFFFFF;">HELIX</span><span style="color: #FF9800;">SIM</span>')
+        heading.setObjectName("mainTitle")
 
         start_btn = QPushButton()
         start_btn.setText("▶ START ENGINE")
+        start_btn.setObjectName("startEngineBtn")
+        start_btn.clicked.connect(self._on_start_btn)
 
         layout.addWidget(heading,0,0,1,3,alignment=Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(start_btn,0,2,1,1,alignment=Qt.AlignmentFlag.AlignRight)
@@ -51,10 +192,20 @@ class ControlPanel(QMainWindow):
         model_label = QLabel("Model")
         model_combo = QComboBox()
         model_combo.addItems(self.model_presets)
+        model_combo.currentTextChanged.connect(partial(
+            self._on_change,
+            category="sim_presets",
+            metric="structural_preset"
+        ))
 
         trajectory_label = QLabel("Trajectory")
         trajectory_combo = QComboBox()
         trajectory_combo.addItems(self.trajectory_presets)
+        trajectory_combo.currentTextChanged.connect(partial(
+            self._on_change,
+            category="sim_presets",
+            metric="trajectory_preset"
+        ))
 
         layout.addWidget(model_label)
         layout.addWidget(model_combo)
@@ -88,6 +239,11 @@ class ControlPanel(QMainWindow):
         mass_spin.setDecimals(6)
         mass_spin.setSingleStep(0.25)
         mass_spin.setRange(0.0,1000.0)
+        mass_spin.valueChanged.connect(partial(
+            self._on_change,
+            category='struct_param',
+            metric='mass'
+        ))
 
         arm_len_spin = QDoubleSpinBox()
         arm_len_spin.setSuffix(" m")
@@ -95,6 +251,11 @@ class ControlPanel(QMainWindow):
         arm_len_spin.setDecimals(6)
         arm_len_spin.setSingleStep(0.25)
         arm_len_spin.setRange(0.0,100.0)
+        arm_len_spin.valueChanged.connect(partial(
+            self._on_change,
+            category='struct_param',
+            metric='arm_length'
+        ))
 
         prop_len_spin = QDoubleSpinBox()
         prop_len_spin.setSuffix(" mm")
@@ -102,6 +263,11 @@ class ControlPanel(QMainWindow):
         prop_len_spin.setDecimals(3)
         prop_len_spin.setSingleStep(0.25)
         prop_len_spin.setRange(0.0,1000.0)
+        prop_len_spin.valueChanged.connect(partial(
+            self._on_change,
+            category='struct_param',
+            metric='prop_length'
+        ))
 
         layout.addRow(QLabel("Mass:"), mass_spin)
         layout.addRow(QLabel("Arm Length:"), arm_len_spin)
@@ -120,7 +286,9 @@ class ControlPanel(QMainWindow):
             steps=0.25,
             min=-10000,
             max=10000,
-            colname=["X","Y","Z"]
+            colname=["X","Y","Z"],
+            category="env_param",
+            metric_prefix="wind_velocity_"
         )
         wind_velo_group.setLayout(wind_velo_spin_layout)
 
@@ -134,6 +302,11 @@ class ControlPanel(QMainWindow):
         turb_intensity.setSingleStep(0.5)
         turb_intensity.setRange(0.0, 50.0)
         turb_intensity.setValue(0.0) # Default to smooth air
+        turb_intensity.valueChanged.connect(partial(
+            self._on_change,
+            category='env_param',
+            metric='turbulence_intensity'
+        ))
 
         # Frequency (How chaotic/fast are the gusts?)
         gust_freq = QDoubleSpinBox()
@@ -142,9 +315,14 @@ class ControlPanel(QMainWindow):
         gust_freq.setSingleStep(0.1)
         gust_freq.setRange(0.0, 20.0)
         gust_freq.setValue(0.0)
+        gust_freq.valueChanged.connect(partial(
+            self._on_change,
+            category='env_param',
+            metric='gust_frequency'
+        ))
 
-        turb_layout.addRow("Turbulence Intensity (Amplitude):", turb_intensity)
-        turb_layout.addRow("Gust Frequency (Chaos rate):", gust_freq)
+        turb_layout.addRow("Turbulence Intensity:", turb_intensity)
+        turb_layout.addRow("Gust Frequency:", gust_freq)
         turbulence_group.setLayout(turb_layout)
 
         gravity_spin = QDoubleSpinBox()
@@ -153,6 +331,11 @@ class ControlPanel(QMainWindow):
         gravity_spin.setDecimals(3)
         gravity_spin.setSingleStep(0.25)
         gravity_spin.setRange(0.0,100.0)
+        gravity_spin.valueChanged.connect(partial(
+            self._on_change,
+            category='env_param',
+            metric='gravity'
+        ))
 
         atmos_pressure_spin = QDoubleSpinBox()
         atmos_pressure_spin.setSuffix(" N/m²")
@@ -160,6 +343,11 @@ class ControlPanel(QMainWindow):
         atmos_pressure_spin.setDecimals(3)
         atmos_pressure_spin.setSingleStep(0.25)
         atmos_pressure_spin.setRange(0.0,100.0)
+        atmos_pressure_spin.valueChanged.connect(partial(
+            self._on_change,
+            category='env_param',
+            metric='atmos_pressure_spin'
+        ))
 
         layout.addRow(QLabel("Wind Velocity:"),wind_velo_group)
         layout.addRow(QLabel("Turbulence & Gusts:"),turbulence_group)
@@ -180,7 +368,9 @@ class ControlPanel(QMainWindow):
             steps=0.001,
             min=0,
             max=100,
-            colname=["Kp", "Ki", "Kd"]
+            colname=["Kp", "Ki", "Kd"],
+            category="control_param",
+            metric_prefix="pid_"
         )
         pid_group.setLayout(pid_spin_layout)
 
@@ -191,24 +381,35 @@ class ControlPanel(QMainWindow):
         esc_latency_spin.setSingleStep(1.0)
         esc_latency_spin.setRange(0.0, 100.0)
         esc_latency_spin.setValue(5.0) # 5ms is a realistic default for DShot ESCs
+        esc_latency_spin.valueChanged.connect(partial(
+            self._on_change,
+            category='control_param',
+            metric='esc_latency'
+        ))
 
         # 2. Sensor Noise (Standard Deviation / Amplitude)
-        sensor_noise_spin = QDoubleSpinBox()
-        sensor_noise_spin.setSuffix(" σ") # Sigma symbol for standard deviation
-        sensor_noise_spin.setDecimals(3)
-        sensor_noise_spin.setSingleStep(0.05)
-        sensor_noise_spin.setRange(0.0, 10.0)
-        sensor_noise_spin.setValue(0.1) # A small amount of base noise
+        imu_sensor_noise_spin = QDoubleSpinBox()
+        imu_sensor_noise_spin.setSuffix(" σ") # Sigma symbol for standard deviation
+        imu_sensor_noise_spin.setDecimals(3)
+        imu_sensor_noise_spin.setSingleStep(0.05)
+        imu_sensor_noise_spin.setRange(0.0, 10.0)
+        imu_sensor_noise_spin.setValue(0.1) # A small amount of base noise
+        imu_sensor_noise_spin.valueChanged.connect(partial(
+            self._on_change,
+            category='control_param',
+            metric='imu_sensor_noise'
+        ))
 
         layout.addRow(QLabel("PID Gains:"),pid_group)
         layout.addRow(QLabel("ESC/Motor Latency"), esc_latency_spin)
-        layout.addRow(QLabel("IMU Sensor Noise"), sensor_noise_spin)
+        layout.addRow(QLabel("IMU Sensor Noise"), imu_sensor_noise_spin)
 
         return tab
 
-    def vector_spin_layout(self,suffix,defult_value,decimals,steps,min,max,colname):
+    def vector_spin_layout(self,suffix,defult_value,decimals,steps,min,max,colname,category,metric_prefix):
         main_layout = QHBoxLayout()
         main_layout.setSpacing(20)
+
         for col in colname:
             layout = QFormLayout()
             spin = QDoubleSpinBox()
@@ -217,6 +418,12 @@ class ControlPanel(QMainWindow):
             spin.setSingleStep(steps)
             spin.setRange(min,max)
             spin.setValue(defult_value)
+            spin.valueChanged.connect(partial(
+                self._on_change,
+                category=category,
+                metric=f"{metric_prefix}{col.lower()}"
+            ))
+
             layout.addRow(col,spin)
             main_layout.addLayout(layout)
 
@@ -225,7 +432,20 @@ class ControlPanel(QMainWindow):
     def bottom_layout(self):
         widget = TelemetryChart()
         return widget
+    
+    def _on_start_btn(self):
+        if self.shared['run_sim'] == 0:
+            self.shared['run_sim'] = 1
+        else:
+            self.shared['run_sim'] = 0
         
+    def _on_change(self,change,category,metric):
+        if category == "_g":
+            self.shared[f"{metric}"] = change
+        else:
+            temp_dict = self.shared[f"{category}"]
+            temp_dict[f"{metric}"] = change
+            self.shared[f"{category}"] = temp_dict
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

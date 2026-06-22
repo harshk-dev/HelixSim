@@ -33,14 +33,7 @@ class UrsinaVisualizer(VizBase):
         camera.look_at(self.drone.drone)
         # EditorCamera()
 
-    def update(self, state):
-        self.updater.update = self.update_engine
-        self.state = state
-
-    def update_engine(self):
-        if self.state is None:
-            return
-        
+    def update(self,state):   
         self.drone.move(
             velox=0,
             veloy=0,
