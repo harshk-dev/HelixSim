@@ -6,3 +6,4 @@ scipy
 pyyaml
 pyqt6
 pyqtgraph
+mypy

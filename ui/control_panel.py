@@ -4,15 +4,16 @@ from PyQt6.QtWidgets import (QMainWindow, QApplication, QVBoxLayout, QHBoxLayout
 from PyQt6.QtCore import Qt
 import sys
 from .telemetry_charts import TelemetryChart
+from sim import SimDataManager
 from functools import partial
 from numpy import array,ndarray
 
 class ControlPanel(QMainWindow):
-    def __init__(self,shared):
+    def __init__(self,data_manager: SimDataManager):
         super().__init__()
         self.model_presets = ["QuadCopter","OctaCopter"]
         self.trajectory_presets = ["Hover","Straight Line","Circular Loop"]
-        self.shared = shared
+        self.data_manager = data_manager
         self.setWindowTitle("HelixSim - Control Panel")
         self.resize(1000, 700)
         self.setStyleSheet(self.get_global_theme())
@@ -192,20 +193,16 @@ class ControlPanel(QMainWindow):
         model_label = QLabel("Model")
         model_combo = QComboBox()
         model_combo.addItems(self.model_presets)
-        model_combo.currentTextChanged.connect(partial(
-            self._on_change,
-            category="sim_presets",
-            metric="structural_preset"
-        ))
+        model_combo.currentTextChanged.connect(
+            self.data_manager.set_structural_preset
+            )
 
         trajectory_label = QLabel("Trajectory")
         trajectory_combo = QComboBox()
         trajectory_combo.addItems(self.trajectory_presets)
-        trajectory_combo.currentTextChanged.connect(partial(
-            self._on_change,
-            category="sim_presets",
-            metric="trajectory_preset"
-        ))
+        trajectory_combo.currentTextChanged.connect(
+            self.data_manager.set_trajectory_preset
+        )
 
         layout.addWidget(model_label)
         layout.addWidget(model_combo)
@@ -346,7 +343,7 @@ class ControlPanel(QMainWindow):
         atmos_pressure_spin.valueChanged.connect(partial(
             self._on_change,
             category='env_param',
-            metric='atmos_pressure_spin'
+            metric='atmospheric_pressure'
         ))
 
         layout.addRow(QLabel("Wind Velocity:"),wind_velo_group)
@@ -434,21 +431,27 @@ class ControlPanel(QMainWindow):
         return widget
     
     def _on_start_btn(self):
-        if self.shared['run_sim'] == 0:
-            self.shared['run_sim'] = 1
+        if self.data_manager.data.run_sim == 0:
+            self.data_manager.data.run_sim = 1
         else:
-            self.shared['run_sim'] = 0
+            self.data_manager.data.run_sim = 0
         
     def _on_change(self,change,category,metric):
         if category == "_g":
-            self.shared[f"{metric}"] = change
+            target_attr = self.data_manager.data
         else:
-            temp_dict = self.shared[f"{category}"]
-            temp_dict[f"{metric}"] = change
-            self.shared[f"{category}"] = temp_dict
+            target_attr = getattr(self.data_manager.data,category)
+
+        with self.data_manager.get_lock():
+            setattr(target_attr,metric,change)
+
+        # print(f"[CHANGE] {metric} = {getattr(getattr(self.data_manager.data,category),metric)}")
+        # print(f"[CHANGE] Struct = {self.data_manager.data.sim_presets.structural_preset}")
+        # print(f"[CHANGE] Trajectory = {self.data_manager.data.sim_presets.trajectory_preset}")
 
 if __name__ == "__main__":
+    data_manager = SimDataManager('config/defaults.yaml')
     app = QApplication(sys.argv)
-    window = ControlPanel()
+    window = ControlPanel(data_manager)
     window.show()
     sys.exit(app.exec())

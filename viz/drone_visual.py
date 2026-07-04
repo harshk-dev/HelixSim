@@ -6,11 +6,11 @@ class DroneViz:
         self.z = z
         self.draw()
         
-    def draw(self,scale=1):
+    def draw(self,scale=0.0125):
         self.drone = Entity(
             model='drone',
             color=color.yellow,
-            scale=(scale,1,scale),
+            scale=(scale,scale,scale),
             x=self.x,
             y=self.y,
             z=self.z
@@ -48,11 +48,11 @@ class DroneViz:
             z=-159
             )
 
-    def move(self,velox,veloy,veloz,RPM,dt):
-        # print(self.y)
-        self.x += (velox * dt)
-        self.drone.y += (veloy * dt)
-        self.z += (veloz * dt)
+    def move(self,posx,posy,posz,rotx,roty,rotz,RPM,dt):
+        self.drone.x = posx
+        self.drone.y = posy
+        self.drone.z = posz
+        self.drone.rotation = (rotx, roty, rotz)
 
         self.rotate_prop(RPM,dt)
 
