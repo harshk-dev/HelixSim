@@ -1,10 +1,7 @@
-from PyQt6.QtWidgets import (QMainWindow, QApplication, QVBoxLayout, QHBoxLayout, QGroupBox,
+from PyQt6.QtWidgets import (QMainWindow, QVBoxLayout, QHBoxLayout, QGroupBox,
                             QLabel, QComboBox, QWidget, QTabWidget, QFormLayout, QPushButton,
                             QGridLayout, QDoubleSpinBox, QStackedWidget)
-from PyQt6.QtCore import Qt, QTimer
-import sys
-import time
-import numpy as np
+from PyQt6.QtCore import Qt
 from .telemetry_charts import TelemetryChart
 from sim import SimDataManager
 from functools import partial

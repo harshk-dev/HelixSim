@@ -64,7 +64,7 @@ class TrajectoryManager:
 
     def circular_loop(self):
         self.update_time()
-        target_speed = 20
+        target_speed = 10
         omega = target_speed / self.radius
         angle = omega * self.time
         x = self.radius * cos(angle)
