@@ -1,92 +1,86 @@
 from PyQt6.QtWidgets import QWidget, QHBoxLayout
 import pyqtgraph as pg
-
-'''
-# ==========================================
-        # 3. BOTTOM SECTION (GRAPHS)
-        # ==========================================
-        from PyQt6.QtWidgets import QWidget, QHBoxLayout
-import pyqtgraph as pg
+import numpy as np
+from collections import deque
+import time
 
 class TelemetryChart(QWidget):
     def __init__(self):
         super().__init__()
         layout = QHBoxLayout(self)
         layout.setSpacing(15)
+        layout.setContentsMargins(0, 0, 0, 0)
+
+        self.max_points = 1500
+        self.start_time = time.time()
+
+        self.time_buffer = deque(maxlen=self.max_points)
+        self.alt_buffer = deque(maxlen=self.max_points)
         
-        # Remove margins so it aligns perfectly with the layout stretches in the main window
-        layout.setContentsMargins(0, 0, 0, 0) 
+        self.rpm_buffers = [deque(maxlen=self.max_points) for _ in range(4)]
 
-        # Create the RPM graph with the Amber accent color
-        self.graph_rpm, self.curve_rpm = self.create_styled_graph(
-            title="Motor RPM", 
-            line_color="#FF9800",  # Industrial Amber
-            y_label="RPM"
-        )
+        layout.addWidget(self.init_rpm_graph())
+        layout.addWidget(self.init_altitude_graph())
+
+    def init_rpm_graph(self):
+        self.rpm_widget = pg.PlotWidget(title="Motor Outputs (RPM)")
+        self.rpm_widget.setBackground('#262629')
+        self.rpm_widget.showGrid(x=True, y=True, alpha=0.15)
+        self.rpm_widget.addLegend(offset=(10, 10), labelTextColor="#D4D4D4")
         
-        # Create the Altitude graph with a contrasting Cyan color
-        self.graph_alt, self.curve_alt = self.create_styled_graph(
-            title="Altitude (Z-Axis)", 
-            line_color="#00E5FF",  # High-visibility Cyan
-            y_label="Meters"
-        )
-
-        layout.addWidget(self.graph_rpm)
-        layout.addWidget(self.graph_alt)
-
-    def create_styled_graph(self, title, line_color, y_label):
-        """Helper method to generate perfectly themed graphs."""
-        graph = pg.PlotWidget()
+        colors = [(55, 114, 255), (16, 124, 87), (230, 81, 0), (255, 152, 0)]
+        labels = ['Front Left', 'Front Right', 'Back Left', 'Back Right']
         
-        # 1. Background & Grid
-        graph.setBackground('#1A1A1A') # Matches the QGroupBox background
-        graph.showGrid(x=True, y=True, alpha=0.15) # Subtle grid lines
+        self.rpm_curves = []
+        for i in range(4):
+            pen = pg.mkPen(color=colors[i], width=2)
+            curve = self.rpm_widget.plot(pen=pen, name=labels[i])
+            self.rpm_curves.append(curve)
+            
+        self.rpm_widget.setLabel('bottom', 'Time', units='s', **{'color': '#A5A5AA'})
+        self.rpm_widget.setLabel('left', 'Velocity', units='RPM', **{'color': '#A5A5AA'})
+        return self.rpm_widget
+
+    def init_altitude_graph(self):
+        self.alt_widget = pg.PlotWidget(title="Z-Axis Telemetry (Altitude)")
+        self.alt_widget.setBackground('#262629')
+        self.alt_widget.showGrid(x=True, y=True, alpha=0.15)
         
-        # 2. Title Styling
-        graph.setTitle(title, color='#FF9800', size='12pt', bold=True)
+        pen = pg.mkPen(color=(226, 226, 229), width=2)
+        self.alt_curve = self.alt_widget.plot(pen=pen)
         
-        # 3. Axis Labels
-        label_styles = {"color": "#AAAAAA", "font-size": "12px", "font-weight": "bold"}
-        graph.setLabel("left", y_label, **label_styles)
-        graph.setLabel("bottom", "Time (s)", **label_styles)
+        self.alt_widget.setLabel('bottom', 'Time', units='s', **{'color': '#A5A5AA'})
+        self.alt_widget.setLabel('left', 'Height', units='m', **{'color': '#A5A5AA'})
+        return self.alt_widget
+
+    def update_telemetry(self, current_alt: float, current_rpms: np.ndarray):
+        current_time = time.time() - self.start_time
         
-        # 4. Axis Lines and Tick Text Styling
-        for axis_name in ['left', 'bottom']:
-            axis = graph.getAxis(axis_name)
-            axis.setPen(pg.mkPen(color='#3A3A3A', width=2))   # The physical axis line
-            axis.setTextPen(pg.mkPen(color='#777777'))        # The numbers on the axis
+        try:
+            scalar_alt = float(np.asarray(current_alt).item())
+            if np.isnan(scalar_alt) or np.isinf(scalar_alt): 
+                scalar_alt = 0.0
+        except (ValueError, TypeError):
+            scalar_alt = 0.0
+
+        flat_rpms = np.asarray(current_rpms).flatten()
         
-        # 5. Create the data curve (the line itself)
-        # Using a slightly thicker width for high visibility on dark backgrounds
-        pen = pg.mkPen(color=line_color, width=2)
-        curve = graph.plot([], [], pen=pen)
+        self.time_buffer.append(current_time)
+        self.alt_buffer.append(scalar_alt)
         
-        return graph, curve
+        for i in range(4):
+            val = 0.0
+            if i < len(flat_rpms):
+                try:
+                    val = float(flat_rpms[i].item())
+                    if np.isnan(val) or np.isinf(val):
+                        val = 0.0
+                except (ValueError, TypeError):
+                    pass
+            self.rpm_buffers[i].append(val)
 
-    # --- Methods to update the data from your physics engine ---
-    
-    def update_rpm(self, time_data, rpm_data):
-        """Pass arrays of time and RPM data to update the line."""
-        self.curve_rpm.setData(time_data, rpm_data)
-
-    def update_altitude(self, time_data, alt_data):
-        """Pass arrays of time and Altitude data to update the line."""
-        self.curve_alt.setData(time_data, alt_data)
-'''
-
-class TelemetryChart(QWidget):
-    def __init__(self):
-        super().__init__()
-        layout = QHBoxLayout(self)
-        layout.setSpacing(15)
-
-        layout.addWidget(self.rpm_graph())
-        layout.addWidget(self.altitude_graph())
-
-    def rpm_graph(self):
-        graph = pg.PlotWidget(title="RPM")
-        return graph
-
-    def altitude_graph(self):
-        graph = pg.PlotWidget(title="Altitude")
-        return graph
+        times_array = np.array(self.time_buffer, dtype=float)
+        self.alt_curve.setData(times_array, np.array(self.alt_buffer, dtype=float))
+        
+        for i in range(4):
+            self.rpm_curves[i].setData(times_array, np.array(self.rpm_buffers[i], dtype=float))

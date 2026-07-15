@@ -138,8 +138,53 @@ class YawPIDParam(Structure):
         ("angle_kd", c_float)
     ]
 
+class HoverParam(Structure):
+    pos_x: float
+    pos_y: float
+    pos_z: float
+    yaw: float
+
+    _fields_ = [
+        ("pos_x", c_float),
+        ("pos_y", c_float),
+        ("pos_z", c_float),
+        ("yaw", c_float)
+    ]
+
+class StraightParam(Structure):
+    slope_x: float
+    slope_y: float
+    slope_z: float
+    intercept_x: float
+    intercept_y: float
+    intercept_z: float
+    yaw: float
+
+    _fields_ = [
+        ("slope_x", c_float),
+        ("slope_y", c_float),
+        ("slope_z", c_float),
+        ("intercept_x", c_float),
+        ("intercept_y", c_float),
+        ("intercept_z", c_float),
+        ("yaw", c_float)
+    ]
+
+class CircularParam(Structure):
+    radius: float
+    height: float
+    yaw: float
+
+    _fields_ = [
+        ("radius", c_float),
+        ("height", c_float),
+        ("yaw", c_float)
+    ]
+
 class SimData(Structure):
     run_sim: int
+    setting_change: int
+    cam_mode: bytes
     struct_param: StructParam
     env_param: EnvParam
     control_param: ControlParam
@@ -149,9 +194,14 @@ class SimData(Structure):
     roll_pid_param: RollPIDParam
     pitch_pid_param: PitchPIDParam
     yaw_pid_param: YawPIDParam
+    hover_param: HoverParam
+    straight_param: StraightParam
+    circular_param: CircularParam
 
     _fields_ = [
         ("run_sim", c_int),
+        ("setting_change", c_int),
+        ("cam_mode", c_char * 16),
         ("struct_param", StructParam),
         ("env_param", EnvParam),
         ("control_param", ControlParam),
@@ -160,7 +210,10 @@ class SimData(Structure):
         ("thrust_pid_param", ThrustPIDParam),
         ("roll_pid_param", RollPIDParam),
         ("pitch_pid_param", PitchPIDParam),
-        ("yaw_pid_param", YawPIDParam)
+        ("yaw_pid_param", YawPIDParam),
+        ("hover_param", HoverParam),
+        ("straight_param", StraightParam),
+        ("circular_param", CircularParam)
     ]
 
 class SimDataManager:
@@ -193,9 +246,14 @@ class SimDataManager:
         self._load_roll_pid_param()
         self._load_pitch_pid_param()
         self._load_yaw_pid_param()
+        self._load_hover_param()
+        self._load_straight_param()
+        self._load_circular_param()
 
     def _load_global_param(self):
         self.memory.run_sim = self.config_dict["run_sim"]
+        self.memory.setting_change = self.config_dict["setting_change"]
+        self.set_cam_mode(self.config_dict["cam_mode"])
 
     def _load_struct_param(self):
         self.memory.struct_param.mass = self.config_dict["struct_param"]["mass"]
@@ -259,15 +317,43 @@ class SimDataManager:
         self.memory.yaw_pid_param.angle_ki = self.config_dict["yaw_pid_param"]["angle_ki"]
         self.memory.yaw_pid_param.angle_kd = self.config_dict["yaw_pid_param"]["angle_kd"]
 
+    # --- NEW TRAJECTORY LOAD METHODS ---
+    def _load_hover_param(self):
+        self.memory.hover_param.pos_x = self.config_dict["hover_param"]["pos_x"]
+        self.memory.hover_param.pos_y = self.config_dict["hover_param"]["pos_y"]
+        self.memory.hover_param.pos_z = self.config_dict["hover_param"]["pos_z"]
+        self.memory.hover_param.yaw = self.config_dict["hover_param"]["yaw"]
+
+    def _load_straight_param(self):
+        self.memory.straight_param.slope_x = self.config_dict["straight_param"]["slope_x"]
+        self.memory.straight_param.slope_y = self.config_dict["straight_param"]["slope_y"]
+        self.memory.straight_param.slope_z = self.config_dict["straight_param"]["slope_z"]
+        self.memory.straight_param.intercept_x = self.config_dict["straight_param"]["intercept_x"]
+        self.memory.straight_param.intercept_y = self.config_dict["straight_param"]["intercept_y"]
+        self.memory.straight_param.intercept_z = self.config_dict["straight_param"]["intercept_z"]
+        self.memory.straight_param.yaw = self.config_dict["straight_param"]["yaw"]
+
+    def _load_circular_param(self):
+        self.memory.circular_param.radius = self.config_dict["circular_param"]["radius"]
+        self.memory.circular_param.height = self.config_dict["circular_param"]["height"]
+        self.memory.circular_param.yaw = self.config_dict["circular_param"]["yaw"]
+
+    def set_cam_mode(self,text: str):
+        self.memory.cam_mode = (text.encode('utf-8')).lower()
+
+    @property
+    def get_cam_mode(self):
+        return self.memory.cam_mode.decode('utf-8')
+
     def set_structural_preset(self,text: str):
-        self.memory.sim_presets.structural_preset = text.encode('utf-8')
+        self.memory.sim_presets.structural_preset = (text.encode('utf-8')).lower()
 
     @property
     def get_structural_preset(self):
         return self.memory.sim_presets.structural_preset.decode('utf-8')
     
     def set_trajectory_preset(self,text: str):
-        self.memory.sim_presets.trajectory_preset = text.encode('utf-8')
+        self.memory.sim_presets.trajectory_preset = (text.encode('utf-8')).lower()
 
     @property
     def get_trajectory_preset(self):
@@ -292,17 +378,3 @@ class SimDataManager:
     @property
     def get_drone_motor_rpm(self):
         return as_array(self.memory.drone_state.motor_rpm)
-
-if __name__ == "__main__":
-    sim_data_manager = SimDataManager("/home/harsh/HelixSim/config/defaults.yaml")
-    print(sim_data_manager.config_dict)
-
-    print("yes" if sim_data_manager.get_trajectory_preset() == "hover" else "no")
-    import numpy as np
-    print(sim_data_manager.get_drone_pos())
-    sim_data_manager.get_drone_pos()[:] = np.array([1,2,3])
-    print(sim_data_manager.get_drone_pos())
-    target_attr = getattr(sim_data_manager.data,"run_sim")
-    print(target_attr)
-    setattr(target_attr,"run_sim",1)
-    print(sim_data_manager.data.run_sim)

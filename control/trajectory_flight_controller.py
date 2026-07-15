@@ -10,7 +10,7 @@ class TrajectoryFlightController():
         self.pitch_pid_param = pitch_pid_param
         self.yaw_pid_param = yaw_pid_param
         self.windup_limit = windup_limit
-        self.target_angle_limit = 0.78 # 45 degree approx
+        self.target_angle_limit = 0.78
         self.max_yaw_rpm = 800
         self.initialize_pid_controllers()
                
@@ -62,7 +62,6 @@ class TrajectoryFlightController():
             windup_limit=self.windup_limit,
             angle_error=True
         )
-        print(self.yaw_pid.kp,self.yaw_pid.ki,self.yaw_pid.kd)
 
     def calculate_thrust(self,drone_pos,drone_velocity,new_z_coor,dt):
         self.z_pid.update_target(new_z_coor)
@@ -73,25 +72,20 @@ class TrajectoryFlightController():
         return thrust
 
     def calculate_pitch(self, drone_pos, drone_orientation, new_x_coor, dt):
-        # X Position Error -> Pitch Angle
         self.x_pid.update_target(new_x_coor)
         target_angle = self.x_pid.calc_cv(drone_pos[0], dt)
         target_angle = max(-self.target_angle_limit, min(target_angle, self.target_angle_limit))
 
         self.pitch_pid.update_target(target_angle)
-        # orientation[1] is pitch
         pitch = self.pitch_pid.calc_cv(drone_orientation[1], dt)
         return pitch
 
     def calculate_roll(self, drone_pos, drone_orientation, new_y_coor, dt):
-        # Y Position Error -> Roll Angle 
         self.y_pid.update_target(new_y_coor)
-        # Note the negative sign: positive roll moves drone in -Y direction
         target_angle = -self.y_pid.calc_cv(drone_pos[1], dt) 
         target_angle = max(-self.target_angle_limit, min(target_angle, self.target_angle_limit))
 
         self.roll_pid.update_target(target_angle)
-        # orientation[0] is roll
         roll = self.roll_pid.calc_cv(drone_orientation[0], dt)
         return roll
 

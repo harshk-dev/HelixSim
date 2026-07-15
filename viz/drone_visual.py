@@ -6,7 +6,7 @@ class DroneViz:
         self.z = z
         self.draw()
         
-    def draw(self,scale=0.0125):
+    def draw(self,scale=0.01):
         self.drone = Entity(
             model='drone',
             color=color.yellow,
@@ -15,7 +15,7 @@ class DroneViz:
             y=self.y,
             z=self.z
             )
-        self.prop1 = Entity(
+        self.prop2 = Entity(
             model='propeller',
             parent=self.drone,
             color=color.black,
@@ -23,7 +23,7 @@ class DroneViz:
             y=55,
             z=159
             )
-        self.prop2 = Entity(
+        self.prop1 = Entity(
             model='propeller',
             parent=self.drone,
             color=color.black,
@@ -57,8 +57,8 @@ class DroneViz:
         self.rotate_prop(RPM,dt)
 
     def rotate_prop(self,RPM,dt):
-        rotation_per_sec = RPM / 60
-        self.prop1.rotation_y += rotation_per_sec * dt
-        self.prop2.rotation_y -= rotation_per_sec * dt
-        self.prop3.rotation_y += rotation_per_sec * dt
-        self.prop4.rotation_y -= rotation_per_sec * dt
+        rotation_per_sec = (RPM * 6) * dt
+        self.prop1.rotation_y += rotation_per_sec[0]
+        self.prop2.rotation_y -= rotation_per_sec[1]
+        self.prop3.rotation_y += rotation_per_sec[2]
+        self.prop4.rotation_y -= rotation_per_sec[3]

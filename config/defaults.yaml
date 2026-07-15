@@ -1,5 +1,9 @@
 run_sim: 0
 
+setting_change: 1
+
+cam_mode: 'origin'
+
 struct_param:
   mass: 1.0
   arm_length: 0.5
@@ -15,10 +19,10 @@ env_param:
   atmospheric_pressure: 1
 
 control_param:
-  base_rpm: 3813
+  base_rpm: 7626       # Doubled to counteract 4x mass with the same thrust coefficient
   min_rpm: 1500
-  max_rpm: 6500
-  windup_limit: 500
+  max_rpm: 13000       # Raised ceiling so it has headroom to climb and stabilize
+  windup_limit: 1000
   esc_latency: 0
   imu_sensor_noise: 0
 
@@ -37,27 +41,47 @@ thrust_pid_param:
   pos_kp: 1.5
   pos_ki: 0.0
   pos_kd: 0.0
-  velo_kp: 400.0
-  velo_ki: 10.0
-  velo_kd: 50.0
+  velo_kp: 1600.0      # Kept at 4x original to move the heavier mass
+  velo_ki: 25.0
+  velo_kd: 200.0
 
 roll_pid_param:
   pos_kp: 0.15
   pos_ki: 0.0
   pos_kd: 0.15
-  angle_kp: 800.0 
-  angle_ki: 5.0   
-  angle_kd: 350.0
+  angle_kp: 2000.0     # High rotational inertia still requires these heavy PID gains
+  angle_ki: 10.0   
+  angle_kd: 800.0      
 
 pitch_pid_param:
   pos_kp: 0.15
   pos_ki: 0.0
   pos_kd: 0.15
-  angle_kp: 800.0
-  angle_ki: 5.0
-  angle_kd: 350.0
+  angle_kp: 2000.0
+  angle_ki: 10.0
+  angle_kd: 800.0
 
 yaw_pid_param:
-  angle_kp: 1500.0 
-  angle_ki: 10.0
-  angle_kd: 200.0
+  angle_kp: 3000.0     
+  angle_ki: 20.0
+  angle_kd: 400.0
+
+hover_param:
+  pos_x: 0.0
+  pos_y: 0.0
+  pos_z: 5.0
+  yaw: 0.0
+
+straight_param:
+  slope_x: 1.0
+  slope_y: 1.0
+  slope_z: 0.0
+  intercept_x: 0.0
+  intercept_y: 0.0
+  intercept_z: 10.0
+  yaw: 0.0
+
+circular_param:
+  radius: 5.0
+  height: 5.0
+  yaw: 0.0

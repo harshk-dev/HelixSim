@@ -1,8 +1,8 @@
 import multiprocessing
 import queue
-import numpy as np
 from sys import argv, exit
 from PyQt6.QtWidgets import QApplication
+from PyQt6.QtCore import QTimer
 from viz import VizBase, UrsinaVisualizer
 from sim import SimDataManager, MotorMixing, TrajectoryManager
 from control import TrajectoryFlightController
@@ -13,15 +13,32 @@ from functools import partial
 
 CONFIG_PATH = 'config/defaults.yaml'
 
-def run_ui(data_manager: SimDataManager):
+def run_ui(telemetry_queue, data_manager: SimDataManager):
     app = QApplication(argv)
     panel = ControlPanel(data_manager)
+    def pull_telemetry():
+        latest_data = None
+        while True:
+            try:
+                latest_data = telemetry_queue.get_nowait()
+            except queue.Empty:
+                break
+        
+        if latest_data is not None:
+            panel.telemetry.update_telemetry(
+                current_alt=latest_data["pos"][2],
+                current_rpms=latest_data["rpm"]
+            )
+
+    timer = QTimer()
+    timer.timeout.connect(pull_telemetry)
+    timer.start(16)
     panel.show()
     exit(app.exec())
 
 def run_engine(state_queue,data_manager: SimDataManager):
     visualizer: VizBase = UrsinaVisualizer(data_manager)
-
+    
     visualizer.initialize()
     def update_engine(state_queue):
         if data_manager.data.run_sim == 1:
@@ -29,7 +46,8 @@ def run_engine(state_queue,data_manager: SimDataManager):
                 data_dict = state_queue.get_nowait()
                 visualizer.update(
                     pos=data_dict["pos"],
-                    orientation=data_dict["orientation"]
+                    orientation=data_dict["orientation"],
+                    rpm=data_dict["rpm"]
                 )
             except queue.Empty:
                 pass
@@ -38,9 +56,9 @@ def run_engine(state_queue,data_manager: SimDataManager):
     visualizer.run()
 
 def run_physics_engine(ui_drone_state_queue,visualizer_drone_state_queue,data_manager: SimDataManager):
-    # settings_change_flag = True
-    while True:
-        if data_manager.data.run_sim == 1:
+    def initiate(setting_change,phy_engine=None):
+        if setting_change or phy_engine == None:
+            data_manager.data.setting_change = 0
             if data_manager.get_structural_preset == "quad":
                 motor_num = 4
             elif data_manager.get_structural_preset == "octa":
@@ -62,9 +80,8 @@ def run_physics_engine(ui_drone_state_queue,visualizer_drone_state_queue,data_ma
                 max_rpm=max_rpm
             )
             
-            trajectory_manager = TrajectoryManager(dt=1/240)
-            trajectory_manager.hover_pos = np.array([14,-20,30])
-            trajectory_manager.yaw = 0
+            trajectory_manager = TrajectoryManager(data_manager,dt=1/240)
+            trajectory_manager.set_trajectory()
 
             flight_controller = TrajectoryFlightController(
                 motor_mix=motor_mixing.mix,
@@ -80,10 +97,16 @@ def run_physics_engine(ui_drone_state_queue,visualizer_drone_state_queue,data_ma
                 ui_drone_state_queue,visualizer_drone_state_queue,data_manager,
                 rpm_func=flight_controller.calculate_rpm
             )
-
-            phy_engine.initialize_engine()
-            phy_engine.run()
-            phy_engine.exit()
+            return phy_engine
+        return phy_engine
+        
+    phy_engine = initiate(data_manager.data.setting_change)
+    while True:
+        phy_engine = initiate(data_manager.data.setting_change,phy_engine)
+        phy_engine.initialize_engine()
+        
+        phy_engine.run()
+        phy_engine.exit()
 
         sleep(1/10)
 
@@ -94,9 +117,9 @@ def main():
     data_manager = SimDataManager(CONFIG_PATH)
     ui_drone_state_queue = multiprocessing.Queue(maxsize=10)
     visualizer_drone_state_queue = multiprocessing.Queue(maxsize=10)
-
+    
     p_engine = multiprocessing.Process(target=run_engine,args=(visualizer_drone_state_queue,data_manager))
-    p_ui = multiprocessing.Process(target=run_ui,args=(data_manager,))
+    p_ui = multiprocessing.Process(target=run_ui,args=(ui_drone_state_queue,data_manager))
     p_phy_engine = multiprocessing.Process(target=run_physics_engine,args=(ui_drone_state_queue,visualizer_drone_state_queue,data_manager))
 
     p_ui.start()
@@ -104,9 +127,7 @@ def main():
     p_phy_engine.start()
 
     p_ui.join()
-    # p_engine.join()
     p_engine.terminate()
-    # p_phy_engine.join()
     p_phy_engine.terminate()
 
 if __name__ == "__main__":
